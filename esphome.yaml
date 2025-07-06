@@ -1,0 +1,646 @@
+substitutions:
+  name: raumklimasensor-<TODO>
+  friendly_name: Raumklimasensor
+
+# Sensorbox v2 config for PCB SBR1 by Thomas Sanladerer
+# The Sensorbox v2 is licensed under CC BY 4.0
+# https://www.printables.com/model/1079858-3d-printer-emission-sensor-array-sensorbox-v2
+
+psram:
+  mode: quad
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2024.11.0
+  name_add_mac_suffix: false
+  platformio_options:
+    board_build.flash_mode: dio
+  project:
+    name: esphome.web
+    version: dev
+
+esp32:
+  board: esp32-s2-saola-1
+  framework:
+    type: arduino
+# Enable logging
+logger:
+
+# Enable Home Assistant API and failsafe mechanisms
+api:
+
+# Allow Over-The-Air updates
+ota:
+- platform: esphome
+
+# Allow provisioning Wi-Fi via serial
+improv_serial:
+
+wifi:
+  # ssid: !secret wifi_ssid
+  # password: !secret wifi_password
+
+  # Main configuration of wifi via the access point
+  ap:
+    ssid: ${name} setup
+    password: <TODO>
+
+
+# In combination with the `ap` this allows the user
+# to provision wifi credentials to the device via WiFi AP.
+captive_portal:
+
+dashboard_import:
+  package_import_url: github://esphome/firmware/esphome-web/esp32s2.yaml@main
+  import_full_config: true
+
+# To have a "next url" for improv serial
+web_server:
+
+
+
+# debug:
+#   update_interval: 5s
+
+# Display dimming
+globals:
+   - id: dbright
+     type: int
+     restore_value: no
+     initial_value: '0'
+     
+output:
+  - platform: ledc
+    pin: GPIO15
+    id: backlight_pwm
+
+light:
+  - platform: monochromatic
+    output: backlight_pwm
+    name: "Display Backlight"
+    id: back_light
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_off: 
+      then:
+        - lambda: |-
+            id(display0).command(0x10);
+    on_turn_on: 
+      then:
+        - lambda: |-
+            id(display0).command(0x11);
+        
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO13
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: top_btn
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 500ms
+    on_press: 
+      then:
+        - lambda: |-
+            switch(id(dbright)){
+            case 0: id(dbright) = 3; id(back_light).turn_on().set_brightness(1.00).perform(); return;
+            case 1: id(dbright) = 0; id(back_light).turn_off().perform();                     return;
+            case 2: id(dbright) = 1; id(back_light).turn_on().set_brightness(0.05).perform(); return;
+            case 3: id(dbright) = 2; id(back_light).turn_on().set_brightness(0.33).perform(); return;
+            }
+  - platform: gpio
+    pin:
+      number: GPIO35
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: front_btn
+    on_click: 
+      - min_length: 10ms
+        max_length: 500ms
+        then:
+          - lambda: |-
+              id(back_light).toggle().perform();
+      - min_length: 10000ms
+        max_length: 15000ms
+        then:
+          - switch.turn_on: factrst
+
+font:
+  - file: "gfonts://Roboto@400"
+    id: font_value_16
+    size: 16
+    bpp: 4
+    glyphs: [
+      "0","1","2","3","4","5","6","7","8","9", ".","µ", "³","m","g","p","<","/","P","a","r","t","i","k","l","e"," ","C","O","₂","V","b","u","f","c","h","L"
+      ]
+  - file: "gfonts://Roboto@400"
+    id: font_value_20
+    size: 20
+    bpp: 4
+    glyphs: [
+      "0","1","2","3","4","5","6","7","8","9", ".","°","C","%", " ","h","P","a",":"
+      ]
+  - file: "gfonts://Roboto@600"
+    id: font_value_28
+    size: 28
+    bpp: 4
+    glyphs: [
+      "0","1","2","3","4","5","6","7","8","9",":"
+      ]
+
+
+color:
+  - id: white
+    hex: FFFFFF
+  - id: grey
+    hex: AAAAAA
+  - id: light_grey
+    hex: CCCCCC
+  - id: yellow
+    hex: FFFA72
+  - id: orange
+    hex: FF9C32
+  - id: red
+    hex: FF1616
+  - id: purple
+    hex: FF16e0
+  - id: meter_high
+    hex: db4437
+  - id: meter_low
+    hex: 43a047
+  - id: meter_medium
+    hex: ffa600
+
+lvgl:
+  pages:
+        - id: gauge_page
+          widgets:
+            - obj:
+                align: CENTER
+                layout:
+                  type: GRID
+                  grid_columns: [FR(1), FR(1)]
+                  grid_rows: [FR(1), FR(1)]
+                height: 240
+                width: 320
+                bg_color: 0xFFFFFF
+                border_width: 0
+                pad_all: 0
+                widgets:
+                  - obj:
+                      border_width: 0
+                      pad_all: 2
+                      grid_cell_column_pos: 0
+                      grid_cell_row_pos: 0
+                      grid_cell_x_align: STRETCH
+                      grid_cell_y_align: STRETCH
+                      layout:
+                        type: FLEX
+                        flex_flow: COLUMN
+                        flex_align_cross: CENTER
+                      widgets:
+                        - label:
+                            text_font: font_value_16
+                            text: "Partikel < 2.5µm"
+                            flex_grow: 0
+                        - obj:
+                            width: 100%
+                            border_width: 0
+                            pad_all: 0
+                            flex_grow: 1
+                            scrollbar_mode: "OFF"
+                            widgets:
+                              - meter:
+                                  height: 100%
+                                  width: 100%
+                                  border_width: 0
+                                  bg_opa: TRANSP
+                                  align: CENTER
+                                  scales:
+                                    - range_from: 0
+                                      range_to: 25
+                                      angle_range: 180 # sets the total angle to 180 = starts mid left and ends mid right
+                                      ticks:
+                                        count: 0
+                                      indicators:
+                                        - line:
+                                            id: val_pm25
+                                            width: 2
+                                            r_mod: 12 # sets line length by this much difference from the scale default radius
+                                            value: -2
+                                        - arc: # first half of the scale background
+                                            color: meter_low
+                                            r_mod: 10 # radius difference from the scale default radius
+                                            width: 20
+                                            start_value: 0
+                                            end_value: 5
+                                        - arc: # second half of the scale background
+                                            color: meter_medium
+                                            r_mod: 10
+                                            width: 20
+                                            start_value: 5
+                                            end_value: 15
+                                        - arc: # second half of the scale background
+                                            color: meter_high
+                                            r_mod: 10
+                                            width: 20
+                                            start_value: 15
+                                            end_value: 25
+                              - obj: # to cover the middle part of meter indicator line
+                                  height: 90
+                                  width: 90
+                                  radius: 45
+                                  align: BOTTOM_MID
+                                  border_width: 0
+                                  bg_color: 0xFFFFFF
+                                  pad_all: 0
+                                  y: 36
+                              - label: # gauge numeric indicator
+                                  id: text_pm25
+                                  text_font: font_value_16
+                                  y: -10
+                                  align: BOTTOM_MID
+                                  text: "0 µg/m³"
+                  - obj:
+                      border_width: 0
+                      pad_all: 2
+                      grid_cell_column_pos: 1
+                      grid_cell_row_pos: 0
+                      grid_cell_x_align: STRETCH
+                      grid_cell_y_align: STRETCH
+                      layout:
+                        type: FLEX
+                        flex_flow: COLUMN
+                        flex_align_cross: CENTER
+                      widgets:
+                        - label:
+                            text_font: font_value_16
+                            text: "CO₂"
+                            flex_grow: 0
+                        - obj:
+                            width: 100%
+                            border_width: 0
+                            pad_all: 0
+                            flex_grow: 1
+                            scrollbar_mode: "OFF"
+                            widgets:
+                              - meter:
+                                  height: 100%
+                                  width: 100%
+                                  border_width: 0
+                                  bg_opa: TRANSP
+                                  align: CENTER
+                                  scales:
+                                    - range_from: 400
+                                      range_to: 3000
+                                      angle_range: 180 # sets the total angle to 180 = starts mid left and ends mid right
+                                      ticks:
+                                        count: 0
+                                      indicators:
+                                        - line:
+                                            id: val_co2
+                                            width: 2
+                                            r_mod: 12 # sets line length by this much difference from the scale default radius
+                                            value: -2
+                                        - arc: # first half of the scale background
+                                            color: meter_low
+                                            r_mod: 10 # radius difference from the scale default radius
+                                            width: 20
+                                            start_value: 400
+                                            end_value: 1000
+                                        - arc: # second half of the scale background
+                                            color: meter_medium
+                                            r_mod: 10
+                                            width: 20
+                                            start_value: 1000
+                                            end_value: 2000
+                                        - arc: # second half of the scale background
+                                            color: meter_high
+                                            r_mod: 10
+                                            width: 20
+                                            start_value: 2000
+                                            end_value: 3000
+                              - obj: # to cover the middle part of meter indicator line
+                                  height: 90
+                                  width: 90
+                                  radius: 45
+                                  align: BOTTOM_MID
+                                  border_width: 0
+                                  bg_color: 0xFFFFFF
+                                  pad_all: 0
+                                  y: 36
+                              - label: # gauge numeric indicator
+                                  id: text_co2
+                                  text_font: font_value_16
+                                  y: -10
+                                  align: BOTTOM_MID
+                                  text: "0 ppm"
+                  - obj:
+                      border_width: 0
+                      pad_all: 2
+                      grid_cell_column_pos: 0
+                      grid_cell_row_pos: 1
+                      grid_cell_x_align: STRETCH
+                      grid_cell_y_align: STRETCH
+                      layout:
+                        type: FLEX
+                        flex_flow: COLUMN
+                        flex_align_cross: CENTER
+                      widgets:
+                        - label:
+                            text_font: font_value_16
+                            text: "VOC"
+                            flex_grow: 0
+                        - obj:
+                            width: 100%
+                            border_width: 0
+                            pad_all: 0
+                            flex_grow: 1
+                            scrollbar_mode: "OFF"
+                            widgets:
+                              - meter:
+                                  height: 100%
+                                  width: 100%
+                                  border_width: 0
+                                  bg_opa: TRANSP
+                                  align: CENTER
+                                  scales:
+                                    - range_from: 0
+                                      range_to: 1000
+                                      angle_range: 180 # sets the total angle to 180 = starts mid left and ends mid right
+                                      ticks:
+                                        count: 0
+                                      indicators:
+                                        - line:
+                                            id: val_voc
+                                            width: 2
+                                            r_mod: 16 # sets line length by this much difference from the scale default radius
+                                            value: -2
+                                        - arc: # first half of the scale background
+                                            color: meter_low
+                                            r_mod: 10 # radius difference from the scale default radius
+                                            width: 20
+                                            start_value: 0
+                                            end_value: 300
+                                        - arc: # second half of the scale background
+                                            color: meter_medium
+                                            r_mod: 10
+                                            width: 20
+                                            start_value: 300
+                                            end_value: 600
+                                        - arc: # second half of the scale background
+                                            color: meter_high
+                                            r_mod: 10
+                                            width: 20
+                                            start_value: 600
+                                            end_value: 1000
+                              - obj: # to cover the middle part of meter indicator line
+                                  height: 90
+                                  width: 90
+                                  radius: 45
+                                  align: BOTTOM_MID
+                                  border_width: 0
+                                  bg_color: 0xFFFFFF
+                                  pad_all: 0
+                                  y: 36
+                              - label: # gauge numeric indicator
+                                  id: text_voc
+                                  text_font: font_value_16
+                                  y: -10
+                                  align: BOTTOM_MID
+                                  text: "0 ppm"
+                  - obj:
+                      border_width: 0
+                      pad_all: 2
+                      grid_cell_column_pos: 1
+                      grid_cell_row_pos: 1
+                      grid_cell_x_align: STRETCH
+                      grid_cell_y_align: STRETCH
+                      layout:
+                        pad_row: 2
+                        pad_column: 0
+                        type: FLEX
+                        flex_flow: COLUMN
+                        flex_align_cross: END
+                      widgets:
+                        - label:
+                            id: text_temp
+                            text_font: font_value_20
+                            text: "0"
+                            flex_grow: 0
+                            width: 100%
+                            text_align: RIGHT
+                        - label:
+                            id: text_hum
+                            text_font: font_value_20
+                            text: "0"
+                            width: 100%
+                            text_align: RIGHT
+                            flex_grow: 0
+                        - label:
+                            id: text_pres
+                            text_font: font_value_20
+                            text: "0"
+                            width: 100%
+                            text_align: RIGHT
+                            flex_grow: 0
+                        - label:
+                            id: text_time
+                            text_font: font_value_28
+                            text: "00:00"
+                            width: 100%
+                            text_align: RIGHT
+                            flex_grow: 0
+
+
+
+display:
+  - platform: ili9xxx    
+    model: ILI9341
+    cs_pin: GPIO03
+    dc_pin: GPIO04
+    reset_pin: GPIO06
+    color_order: bgr
+    invert_colors: false
+    dimensions:
+      height: 320
+      width: 240
+    auto_clear_enabled: false
+    rotation: 90
+    id: display0
+    update_interval: never
+
+uart:
+  - tx_pin: GPIO08
+    rx_pin: GPIO07
+    baud_rate: 9600
+    id: uart_pms
+
+spi:
+  clk_pin: GPIO01
+  mosi_pin: GPIO02
+  miso_pin: GPIO16
+
+i2c:
+  - sda: GPIO11
+    scl: GPIO12
+    scan: true
+    id: i2c_main
+
+time:
+  - platform: homeassistant
+    id: time_comp
+    timezone: Europe/Vienna
+    on_time_sync:
+      - script.execute: time_update
+    on_time:
+      - minutes: '*'
+        seconds: 0
+        then:
+          - script.execute: time_update
+
+script:
+  - id: time_update
+    then:
+      - lvgl.label.update:
+          id: text_time
+          text:
+            format: "%02d:%02d"
+            args: [ id(time_comp).now().hour, id(time_comp).now().minute ]
+
+sensor:
+  - platform: uptime
+    name: "Uptime"
+    id: uptime_sensor
+    update_interval: 5s
+    disabled_by_default: True
+
+  - platform: aht10
+    i2c_id: i2c_main
+    variant: AHT20
+    temperature:
+      name: "AHT20 Temperature"
+      id: temp_aht20
+      on_value:
+      - lvgl.label.update:
+          id: text_temp
+          text:
+            format: "%.1f °C"
+            args: [ 'x' ]
+    humidity:
+      name: "AHT20 Humidity"
+      id: hum_aht20
+      on_value:
+      - lvgl.label.update:
+          id: text_hum
+          text:
+            format: "%.1f %%"
+            args: [ 'x' ]
+    update_interval: 10s
+
+  - platform: bmp280_i2c
+    address: 0x77
+    i2c_id: i2c_main
+    temperature:
+      name: "BMP280 Temperature"
+      id: temp_bmp280
+      oversampling: 16x
+    pressure:
+      name: "BMP280 Pressure"
+      id: pres_bmp280
+      on_value:
+      - lvgl.label.update:
+          id: text_pres
+          text:
+            format: "%.1f hPa"
+            args: [ 'x' ]
+    update_interval: 10s
+
+  - platform: scd4x
+    i2c_id: i2c_main
+    co2:
+      name: "SCD40 CO2"
+      id: co2_scd40
+      on_value:
+      - lvgl.indicator.update:
+          id: val_co2
+          value: !lambda return x;
+      - lvgl.label.update:
+          id: text_co2
+          text:
+            format: "%.0f ppm"
+            args: [ 'x' ]
+    temperature:
+      name: "SCD40 Temperature"
+      id: temp_scd40
+    humidity:
+      name: "SCD40 Humidity"
+      id: hum_scd40
+    update_interval: 30s
+
+  - platform: sgp30
+    i2c_id: i2c_main
+    address: 0x58
+    eco2:
+      name: "SGP30 eCO2"
+      id: eco2_sgp30
+      accuracy_decimals: 0
+      filters: 
+        - exponential_moving_average: 
+            send_every: 1
+            alpha: 0.2
+    tvoc:
+      name: "SGP30 TVOC"
+      id: tvoc_sgp30
+      accuracy_decimals: 1
+      filters: 
+        - exponential_moving_average: 
+            send_every: 1
+            alpha: 0.2
+      on_value:
+      - lvgl.indicator.update:
+          id: val_voc
+          value: !lambda return x;
+      - lvgl.label.update:
+          id: text_voc
+          text:
+            format: "%.0f ppb"
+            args: [ 'x' ]
+    store_baseline: yes
+    update_interval: 5s
+    compensation: 
+      humidity_source: hum_aht20
+      temperature_source: temp_aht20
+
+  - platform: pmsx003
+    type: PMSX003 
+    update_interval: 120s
+    uart_id: uart_pms
+    pm_1_0:
+      name: "PMS Particulate Matter <1.0µm Concentration"
+      id: pm1_pms
+    pm_2_5:
+      name: "PMS Particulate Matter <2.5µm Concentration"
+      id: pm25_pms
+      on_value:
+      - lvgl.indicator.update:
+          id: val_pm25
+          value: !lambda return x;
+      - lvgl.label.update:
+          id: text_pm25
+          text:
+            format: "%.0f µg/m³"
+            args: [ 'x' ]
+    pm_10_0:
+      name: "PMS Particulate Matter <10.0µm Concentration"
+      id: pm10_pms
+
+switch:
+  - platform: factory_reset
+    id: factrst
