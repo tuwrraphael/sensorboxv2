@@ -493,6 +493,11 @@ i2c:
     scan: true
     id: i2c_main
 
+  - sda: GPIO18
+    scl: GPIO17
+    scan: false
+    id: i2c_2
+
 time:
   - platform: homeassistant
     id: time_comp
@@ -520,6 +525,10 @@ sensor:
     id: uptime_sensor
     update_interval: 5s
     disabled_by_default: True
+
+  - platform: internal_temperature
+    name: "ESP32 Internal Temperature"
+    update_interval: 60s
 
   - platform: aht10
     i2c_id: i2c_main
@@ -640,6 +649,93 @@ sensor:
     pm_10_0:
       name: "PMS Particulate Matter <10.0µm Concentration"
       id: pm10_pms
+
+  - platform: ina226
+    address: 0x40
+    shunt_resistance: 0.1 ohm
+    max_current: 0.8A
+    update_interval: 1s
+    current:
+      name: "INA226 Current"
+      id: ina226_current
+      internal: true
+    power:
+      name: "INA226 Power"
+      id: ina226_power
+      internal: true
+    bus_voltage:
+      name: "INA226 Bus Voltage"
+      id: ina226_bus_voltage
+      internal: true
+    shunt_voltage:
+      name: "INA226 Shunt Voltage"
+      id: ina226_shunt_voltage
+      internal: true
+    i2c_id: i2c_2
+
+  - platform: total_daily_energy
+    name: "INA226 Daily Energy"
+    power_id: ina226_power
+    unit_of_measurement: Wh
+    accuracy_decimals: 2
+    id: ina226_daily_energy
+    internal: true
+
+  - platform: template
+    name: "Raumklimasensor Current"
+    lambda: |-
+      if (id(ina226_current).state) {
+        return (id(ina226_current).state);
+      } else {
+        return 0;
+      }
+    unit_of_measurement: A
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 4
+    update_interval: 10s
+  
+  - platform: template
+    name: "Raumklimasensor Voltage"
+    lambda: |-
+      if (id(ina226_bus_voltage).state) {
+        return (id(ina226_bus_voltage).state);
+      } else {
+        return 0;
+      }
+    unit_of_measurement: V
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: 10s
+
+  - platform: template
+    name: "Raumklimasensor Power"
+    lambda: |-
+      if (id(ina226_power).state) {
+        return (id(ina226_power).state);
+      } else {
+        return 0;
+      }
+    unit_of_measurement: W
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: 10s
+
+  - platform: template
+    name: "Raumklimasensor Energy Heute"
+    lambda: |-
+      if (id(ina226_daily_energy).state) {
+        return (id(ina226_daily_energy).state);
+      } else {
+        return 0;
+      }
+    unit_of_measurement: Wh
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 2
+    update_interval: 10s
 
 switch:
   - platform: factory_reset
