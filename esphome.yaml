@@ -60,8 +60,16 @@ web_server:
 
 
 
-# debug:
-#   update_interval: 5s
+debug:
+  update_interval: 60s
+
+text_sensor:
+  - platform: debug
+    device:
+      name: "Device Info"
+    reset_reason:
+      name: "Reset Reason"
+
 
 # Display dimming
 globals:
@@ -178,6 +186,7 @@ color:
     hex: ffa600
 
 lvgl:
+  rotation: 90
   pages:
         - id: gauge_page
           widgets:
@@ -217,22 +226,23 @@ lvgl:
                             scrollbar_mode: "OFF"
                             widgets:
                               - meter:
-                                  height: 100%
-                                  width: 100%
+                                  height: 152
+                                  width: 152
+                                  y: 6
                                   border_width: 0
                                   bg_opa: TRANSP
-                                  align: CENTER
                                   scales:
                                     - range_from: 0
                                       range_to: 25
                                       angle_range: 180 # sets the total angle to 180 = starts mid left and ends mid right
                                       ticks:
-                                        count: 0
+                                        count: 2
+                                        width: 0
                                       indicators:
                                         - line:
                                             id: val_pm25
                                             width: 2
-                                            r_mod: 12 # sets line length by this much difference from the scale default radius
+                                            length: 65 # sets line length by this much difference from the scale default radius
                                             value: -2
                                         - arc: # first half of the scale background
                                             color: meter_low
@@ -260,7 +270,7 @@ lvgl:
                                   border_width: 0
                                   bg_color: 0xFFFFFF
                                   pad_all: 0
-                                  y: 36
+                                  y: 42
                               - label: # gauge numeric indicator
                                   id: text_pm25
                                   text_font: font_value_16
@@ -291,22 +301,23 @@ lvgl:
                             scrollbar_mode: "OFF"
                             widgets:
                               - meter:
-                                  height: 100%
-                                  width: 100%
+                                  height: 152
+                                  width: 152
+                                  y: 6
                                   border_width: 0
                                   bg_opa: TRANSP
-                                  align: CENTER
                                   scales:
                                     - range_from: 400
                                       range_to: 3000
                                       angle_range: 180 # sets the total angle to 180 = starts mid left and ends mid right
                                       ticks:
-                                        count: 0
+                                        count: 2
+                                        width: 0
                                       indicators:
                                         - line:
                                             id: val_co2
                                             width: 2
-                                            r_mod: 12 # sets line length by this much difference from the scale default radius
+                                            length: 65 # sets line length by this much difference from the scale default radius
                                             value: -2
                                         - arc: # first half of the scale background
                                             color: meter_low
@@ -334,7 +345,7 @@ lvgl:
                                   border_width: 0
                                   bg_color: 0xFFFFFF
                                   pad_all: 0
-                                  y: 36
+                                  y: 42
                               - label: # gauge numeric indicator
                                   id: text_co2
                                   text_font: font_value_16
@@ -365,22 +376,23 @@ lvgl:
                             scrollbar_mode: "OFF"
                             widgets:
                               - meter:
-                                  height: 100%
-                                  width: 100%
+                                  height: 152
+                                  width: 152
+                                  y: 6
                                   border_width: 0
                                   bg_opa: TRANSP
-                                  align: CENTER
                                   scales:
                                     - range_from: 0
                                       range_to: 1000
                                       angle_range: 180 # sets the total angle to 180 = starts mid left and ends mid right
                                       ticks:
-                                        count: 0
+                                        count: 2
+                                        width: 0
                                       indicators:
                                         - line:
                                             id: val_voc
                                             width: 2
-                                            r_mod: 16 # sets line length by this much difference from the scale default radius
+                                            length: 65 # sets line length by this much difference from the scale default radius
                                             value: -2
                                         - arc: # first half of the scale background
                                             color: meter_low
@@ -408,7 +420,7 @@ lvgl:
                                   border_width: 0
                                   bg_color: 0xFFFFFF
                                   pad_all: 0
-                                  y: 36
+                                  y: 42
                               - label: # gauge numeric indicator
                                   id: text_voc
                                   text_font: font_value_16
@@ -472,7 +484,6 @@ display:
       height: 320
       width: 240
     auto_clear_enabled: false
-    rotation: 90
     id: display0
     update_interval: never
 
@@ -525,6 +536,16 @@ sensor:
     id: uptime_sensor
     update_interval: 5s
     disabled_by_default: True
+
+  - platform: debug
+    free:
+      name: "Heap Free"
+    block:
+      name: "Heap Max Block"
+    loop_time:
+      name: "Loop Time"
+    cpu_frequency:
+      name: "CPU Frequency"
 
   - platform: internal_temperature
     name: "ESP32 Internal Temperature"
